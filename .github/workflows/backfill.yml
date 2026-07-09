@@ -1,0 +1,43 @@
+name: backfill
+
+# Manual only, per architecture doc §3 ("backfill (one-time), manual"). Re-run
+# if NAV history for the canonical universe needs reseeding (e.g. after a
+# universe-coverage gap, or if mfapi.in were ever swapped for another source).
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Optional: backfill only the first N funds (leave blank for full universe)"
+        required: false
+        default: ""
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Run backfill
+        run: |
+          if [ -n "${{ inputs.limit }}" ]; then
+            python -m pipeline.jobs.backfill --limit "${{ inputs.limit }}"
+          else
+            python -m pipeline.jobs.backfill
+          fi
+
+      - name: Commit and push updated artifacts
+        run: |
+          git config user.name "mfscreener-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet && echo "No data changes" && exit 0
+          git commit -m "chore(data): backfill $(date -u +%Y-%m-%d)"
+          git push

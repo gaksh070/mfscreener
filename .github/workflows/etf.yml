@@ -1,0 +1,33 @@
+name: etf-daily
+
+# Mon-Fri 22:30 UTC, per architecture doc §3 (after US markets close).
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Run etf_daily
+        run: python -m pipeline.jobs.etf_daily
+
+      - name: Commit and push updated artifacts
+        run: |
+          git config user.name "mfscreener-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet && echo "No data changes" && exit 0
+          git commit -m "chore(data): etf_daily $(date -u +%Y-%m-%d)"
+          git push

@@ -1,0 +1,39 @@
+name: nav-daily
+
+# Mon-Fri 17:45 UTC (~23:15 IST), per architecture doc §3. AMFI publishes the
+# day's NAV file in the evening IST; this runs after that's expected to land.
+on:
+  schedule:
+    - cron: "45 17 * * 1-5"
+  workflow_dispatch: {}
+
+# GitHub sends a failure-notification email to the repo owner/watchers by
+# default when a workflow run fails ("email notification, GitHub Actions
+# native" per architecture doc) -- no extra step needed, but the operator
+# must keep "Actions" failure emails enabled under GitHub notification
+# settings (on by default).
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Run nav_daily
+        run: python -m pipeline.jobs.nav_daily
+
+      - name: Commit and push updated artifacts
+        run: |
+          git config user.name "mfscreener-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet && echo "No data changes" && exit 0
+          git commit -m "chore(data): nav_daily $(date -u +%Y-%m-%d)"
+          git push

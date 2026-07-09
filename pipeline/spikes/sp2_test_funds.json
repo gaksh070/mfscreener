@@ -1,0 +1,21 @@
+[
+  {"amc": "HDFC", "category": "Mid Cap", "schemeCode": 118989, "schemeName": "HDFC Mid Cap Fund - Growth Option - Direct Plan"},
+  {"amc": "ICICI Prudential", "category": "Large Cap", "schemeCode": 120586, "schemeName": "ICICI Prudential Large Cap Fund (erstwhile Bluechip Fund) - Direct Plan - Growth"},
+  {"amc": "Axis", "category": "Small Cap", "schemeCode": 125354, "schemeName": "Axis Small Cap Fund - Direct Plan - Growth"},
+  {"amc": "Nippon India", "category": "Small Cap", "schemeCode": 118778, "schemeName": "Nippon India Small Cap Fund - Direct Plan Growth Plan - Growth Option"},
+  {"amc": "Mirae Asset", "category": "Large Cap", "schemeCode": 118825, "schemeName": "Mirae Asset Large Cap Fund - Direct Plan - Growth"},
+  {"amc": "UTI", "category": "Index", "schemeCode": 120716, "schemeName": "UTI Nifty 50 Index Fund - Growth Option- Direct"},
+  {"amc": "DSP", "category": "Mid Cap", "schemeCode": 119071, "schemeName": "DSP Midcap Fund - Direct Plan - Growth"},
+  {"amc": "Motilal Oswal", "category": "Mid Cap", "schemeCode": 127042, "schemeName": "Motilal Oswal Midcap Fund-Direct Plan-Growth Option"},
+  {"amc": "Quant", "category": "Small Cap", "schemeCode": 120828, "schemeName": "quant Small Cap Fund - Growth Option - Direct Plan"},
+  {"amc": "PGIM", "category": "Mid Cap", "schemeCode": 125307, "schemeName": "PGIM India Midcap Fund - Direct Plan - Growth Option"},
+  {"amc": "Tata", "category": "Sectoral", "schemeCode": 135800, "schemeName": "Tata Digital India Fund-Direct Plan-Growth"},
+  {"amc": "Invesco", "category": "Mid Cap", "schemeCode": 120403, "schemeName": "Invesco India Midcap Fund - Direct Plan - Growth Option"},
+  {"amc": "Sundaram", "category": "Mid Cap", "schemeCode": 119581, "schemeName": "Sundaram Mid Cap Fund Direct Plan - Growth"},
+  {"amc": "Parag Parikh", "category": "Flexi Cap", "schemeCode": 122639, "schemeName": "Parag Parikh Flexi Cap Fund - Direct Plan - Growth"},
+  {"amc": "Edelweiss", "category": "Mid Cap", "schemeCode": 140228, "schemeName": "Edelweiss Mid Cap Fund - Direct Plan - Growth Option"},
+  {"amc": "Franklin Templeton", "category": "Flexi Cap", "schemeCode": 118535, "schemeName": "Franklin India Flexi Cap Fund - Direct - Growth"},
+  {"amc": "SBI", "category": "Small Cap", "schemeCode": 125497, "schemeName": "SBI Small Cap Fund - Direct Plan - Growth"},
+  {"amc": "Kotak", "category": "Flexi Cap", "schemeCode": 120166, "schemeName": "Kotak Flexicap Fund - Growth - Direct"},
+  {"amc": "ICICI Prudential", "category": "Value", "schemeCode": 120323, "schemeName": "ICICI Prudential Value Fund (erstwhile Value Discovery Fund) - Direct Plan - Growth"}
+]
