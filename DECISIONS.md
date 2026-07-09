@@ -164,3 +164,18 @@ Also fixed in the same pass: `fetch_amfi_nav_all()` was decoding AMFI's UTF-8 fi
 ISO-8859-1 (requests' guessed fallback, since AMFI doesn't declare a charset), mangling
 apostrophes in scheme names ("Childrenâ€™s Fund" instead of "Children's Fund"). Now
 decodes `r.content` as UTF-8 explicitly.
+
+### 2026-07-09 — Build pinned to `next build --webpack`, not Turbopack (production bug)
+After the first deploy, every single fund page 404'd — both on Vercel and locally via
+`next start`. Root cause: `params` on `app/fund/[slug]/page.tsx` was typed and destructured
+as a plain object (`{ params: { slug: string } }`), but this Next.js version requires
+`params` to be a `Promise` (async params). Destructuring a Promise synchronously gives
+`undefined` for `slug` at runtime, so every fund page's `getFund(undefined)` returned
+nothing and hit `notFound()`. **The default `next build` (Turbopack) compiled this with
+zero errors or warnings.** Only `next build --webpack` caught it, correctly, as a type
+error ("Type '{ slug: string }' is missing... Promise"). Fixed the page to `await params`
+per the async-params convention, and changed `package.json`'s `build` script to
+`next build --webpack` explicitly so this class of bug can't silently ship again. This is
+a real Turbopack production-build gap as of Next.js 16.2.10, not a one-off mistake worth
+shrugging off — revisit pinning to webpack if a later Next.js version fixes it, but don't
+drop the pin without re-verifying dynamic routes specifically.

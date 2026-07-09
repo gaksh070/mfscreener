@@ -16,8 +16,13 @@ function getFund(slug: string) {
   return loadFunds().find((f) => f.slug === slug);
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }): Metadata {
-  const fund = getFund(params.slug);
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const fund = getFund(slug);
   if (!fund) return {};
   return {
     title: fund.name,
@@ -27,8 +32,9 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   };
 }
 
-export default function FundPage({ params }: { params: { slug: string } }) {
-  const fund = getFund(params.slug);
+export default async function FundPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const fund = getFund(slug);
   if (!fund) notFound();
 
   const history = loadNavHistory(fund.scheme_code);

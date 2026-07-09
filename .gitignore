@@ -8,3 +8,5 @@ __pycache__/
 .env*.local
 *.tsbuildinfo
 public/search-index.json
+.vercel
+.env*
