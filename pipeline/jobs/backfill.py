@@ -21,7 +21,7 @@ import requests
 
 from .common import (
     DATA_DIR, FUNDS_JSON, NAV_DIR,
-    compute_returns, load_json, update_meta, write_json_atomic,
+    compute_returns, load_json, sanitize_nav_series, update_meta, write_json_atomic,
 )
 
 JOB_NAME = "backfill"
@@ -49,7 +49,7 @@ def backfill_one(fund: dict):
     scheme_code = fund["scheme_code"]
     raw, err = fetch_history(scheme_code)
     if err:
-        return scheme_code, "error", err
+        return scheme_code, "error", err, None
     series = []
     for row in raw:
         try:
@@ -60,12 +60,16 @@ def backfill_one(fund: dict):
         if n > 0:
             series.append((d, n))
     if len(series) < 30:
-        return scheme_code, "insufficient_history", f"{len(series)} points"
+        return scheme_code, "insufficient_history", f"{len(series)} points", None
 
     series.sort(key=lambda x: x[0])
-    history = [[d.strftime("%Y-%m-%d"), n] for d, n in series]
+    clean, jumps = sanitize_nav_series(series)
+    if len(clean) < 30:
+        return scheme_code, "insufficient_history", f"{len(clean)} points after discontinuity removal", jumps
+
+    history = [[d.strftime("%Y-%m-%d"), n] for d, n in clean]
     write_json_atomic(NAV_DIR / f"{scheme_code}.json", history)
-    return scheme_code, "ok", len(series)
+    return scheme_code, "ok", len(clean), jumps
 
 
 def run(limit: int | None = None) -> None:
@@ -76,17 +80,19 @@ def run(limit: int | None = None) -> None:
 
     results = {"ok": 0, "insufficient_history": 0, "error": 0}
     errors = []
-    funds_by_code = {f["scheme_code"]: f for f in funds}
+    discontinuities = []  # (scheme_code, jumps) for funds where a NAV rebase/artifact was detected and excised
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         futures = {pool.submit(backfill_one, f): f for f in india_funds}
         done = 0
         for fut in as_completed(futures):
-            scheme_code, status, detail = fut.result()
+            scheme_code, status, detail, jumps = fut.result()
             results[status] += 1
             done += 1
             if status == "error":
                 errors.append((scheme_code, detail))
+            if jumps:
+                discontinuities.append((scheme_code, jumps))
             if done % 100 == 0 or done == len(india_funds):
                 print(f"[{JOB_NAME}] {done}/{len(india_funds)} processed "
                       f"(ok={results['ok']}, insufficient={results['insufficient_history']}, "
@@ -117,10 +123,17 @@ def run(limit: int | None = None) -> None:
         "errors": results["error"],
         "coverage_pct": coverage_pct,
         "returns_recomputed": updated,
+        "discontinuities_detected": len(discontinuities),
+        "discontinuity_scheme_codes": [code for code, _ in discontinuities],
     })
     print(f"[{JOB_NAME}] DONE: {results['ok']}/{len(india_funds)} backfilled "
           f"({coverage_pct}% coverage), {results['insufficient_history']} too-new, "
           f"{results['error']} errors, {updated} funds' returns recomputed")
+    if discontinuities:
+        print(f"[{JOB_NAME}] {len(discontinuities)} scheme(s) had a NAV discontinuity excised "
+              f"(face-value/denomination artifact, not a real return):")
+        for code, jumps in discontinuities:
+            print(f"  {code}: {jumps}")
     if errors[:10]:
         print(f"[{JOB_NAME}] sample errors: {errors[:10]}")
 

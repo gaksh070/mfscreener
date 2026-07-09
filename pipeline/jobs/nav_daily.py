@@ -47,6 +47,7 @@ def run() -> None:
         as_of_dates = set()
         new_funds = []
         closed_count = 0
+        anomalies: list[dict] = []
         today = datetime.utcnow()
         for row in canonical_rows:
             scheme_code = row["scheme_code"]
@@ -58,12 +59,19 @@ def run() -> None:
             category, sub_category = parse_group(row["group"])
             prev_record = previous_by_code.get(scheme_code, {})
 
-            # A stale (>10 days old) zero/negative NAV means AMFI itself has stopped
-            # updating this scheme -- a wound-up/merged fund (PRD F-02 edge case),
-            # not a live data anomaly. Retain the record with status "closed" and
+            # AMFI itself has stopped updating a scheme's NAV in two observed
+            # shapes: a stale zero/negative NAV (>10 days old), or a stale but
+            # nonzero NAV frozen for a long time (observed: >1 year, e.g. a
+            # Franklin scheme whose AMFI-reported date was still "02-May-2025"
+            # when fetched in July 2026). Both mean the scheme is wound-up/
+            # frozen (PRD F-02 edge case), not a live data anomaly -- and
+            # critically, appending either to NAV history would either add a
+            # zero or create a huge apparent day-over-day jump against
+            # whatever real price the scheme last had. Retain "closed" with
             # last-good NAV rather than crash the whole job over one dead scheme.
-            is_stale_zero = nav <= 0 and (today - nav_date).days > 10
-            if is_stale_zero:
+            days_stale = (today - nav_date).days
+            is_closed = (nav <= 0 and days_stale > 10) or days_stale > 60
+            if is_closed:
                 closed_count += 1
                 new_funds.append({
                     "id": row["isin"] or prev_record.get("id") or scheme_code,
@@ -83,14 +91,27 @@ def run() -> None:
                 })
                 continue
 
-            validate_nav_value(scheme_code, nav)
-            as_of_dates.add(nav_date.date())
-
             nav_path = NAV_DIR / f"{scheme_code}.json"
             history = load_json(nav_path, default=[])  # list of [iso_date, nav]
             prev_nav = history[-1][1] if history else None
-            validate_day_over_day(scheme_code, prev_nav, nav)
 
+            # A single scheme failing NAV sanity (bad value, or a jump that
+            # looks like a rebase/denomination change -- see DECISIONS.md
+            # "funds.json concurrent-write race" sibling entry on backfill's
+            # sanitize_nav_series for the same class of issue) must never
+            # abort the whole day's run for every other scheme. Flag it,
+            # carry the fund's last-good record forward unchanged, and keep
+            # going -- an operator reviews `anomalies` in meta.json.
+            try:
+                validate_nav_value(scheme_code, nav)
+                validate_day_over_day(scheme_code, prev_nav, nav)
+            except JobError as e:
+                anomalies.append({"scheme_code": scheme_code, "name": row["name"], "reason": str(e)})
+                if prev_record:
+                    new_funds.append(prev_record)
+                continue
+
+            as_of_dates.add(nav_date.date())
             nav_date_iso = nav_date.strftime("%Y-%m-%d")
             if not history or history[-1][0] != nav_date_iso:
                 history.append([nav_date_iso, nav])
@@ -136,10 +157,15 @@ def run() -> None:
         update_meta(JOB_NAME, "ok", {
             "universe_size": len(canonical_rows),
             "closed_schemes": closed_count,
+            "anomalies_flagged": len(anomalies),
+            "anomalies": anomalies,
             "nav_asof": nav_asof,
             "data_gaps": ["expense_ratio", "benchmark", "inception", "exit_load", "aum"],
         })
-        print(f"[{JOB_NAME}] OK: {len(canonical_rows)} schemes ({closed_count} closed), nav_asof={nav_asof}")
+        print(f"[{JOB_NAME}] OK: {len(canonical_rows)} schemes ({closed_count} closed, "
+              f"{len(anomalies)} anomalies flagged), nav_asof={nav_asof}")
+        if anomalies:
+            print(f"[{JOB_NAME}] anomalies (NAV unchanged from last-good, needs review): {anomalies}")
 
     except JobError as e:
         fail(JOB_NAME, str(e))

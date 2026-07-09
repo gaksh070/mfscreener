@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* ---------- MF Screener design tokens · Design Direction v2 · light (v1) ---------- */
+:root {
+  --bg: #ffffff;
+  --bg-alt: #f6f7f9;
+  --ink: #1e222a;
+  --ink-soft: #606774;
+  --line: #e3e6ea;
+
+  --accent: #4f46e5; /* THE accent — locked sitewide */
+  --accent-soft: #eef0fd;
+  --accent-ink: #ffffff;
+
+  --dark-base: #222530; /* reserved: dark-mode bg + optional dark footer band */
+
+  --gain: #13804e; /* positive returns ONLY */
+  --loss: #c0392b; /* negative returns ONLY */
+  --warn: #b0740f; /* staleness ONLY */
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", sans-serif;
+}
+
+* {
+  border-color: var(--line);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Density-7 data surfaces (screener, fund-page tables) drop to 15px per v2 §2.2 */
+.data-density {
+  font-size: 15px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shape lock (v2 §2.4): cards 12 / tables 0 / buttons+inputs 8 / chips pill. */
+.mfs-card {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  box-shadow: 0 1px 2px rgb(30 34 42 / 0.05);
+}
+
+.mfs-chip {
+  border-radius: 9999px;
+}

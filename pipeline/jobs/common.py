@@ -48,12 +48,16 @@ def slugify(name: str) -> str:
 
 
 def fetch_amfi_nav_all(retries: int = 3, timeout: int = 30) -> str:
+    """AMFI serves this file as UTF-8 (scheme names contain real UTF-8
+    apostrophes, e.g. 'Children’s Fund') but doesn't declare a charset,
+    so `requests` falls back to guessing ISO-8859-1 and mangles them into
+    mojibake ('Childrenâ€s Fund'). Decode the raw bytes as UTF-8 explicitly."""
     last_err = None
     for _ in range(retries):
         try:
             r = requests.get(AMFI_NAV_URL, timeout=timeout, allow_redirects=True)
             r.raise_for_status()
-            return r.text
+            return r.content.decode("utf-8")
         except Exception as e:  # noqa: BLE001 - retry loop, re-raised below
             last_err = e
     raise JobError(f"Failed to fetch AMFI NAVAll.txt after {retries} attempts: {last_err}")
@@ -144,6 +148,42 @@ def fail(job_name: str, message: str) -> None:
     update_meta(job_name, "failed", {"error": message})
     print(f"[{job_name}] FAILED: {message}", file=sys.stderr)
     sys.exit(1)
+
+
+def sanitize_nav_series(series_sorted: list[tuple[datetime, float]], jump_threshold: float = 0.5):
+    """Detects and removes NAV-history discontinuities (face-value/denomination
+    changes in the source data -- observed as ~10x or ~100x single-day jumps,
+    e.g. 116.47 -> 1164.89 with no corresponding real event). A >50% single-day
+    move is far beyond even the worst real equity crash, so any such jump
+    marks a data artifact, not a return.
+
+    Splits the series at every such jump and always keeps the MOST RECENT
+    segment, never the longest -- nav_daily appends each new day's NAV onto
+    the end of the stored history, so that tail must be on the same scale as
+    live incoming data, regardless of how much history that costs. A shorter
+    but current-scale series degrades gracefully (return/rolling calcs
+    already return None when history is insufficient); a longer but stale-
+    scale series would silently corrupt every future day-over-day check.
+    Returns (clean_series, list_of_detected_jumps) for audit logging -- never
+    silently drops data without a trace.
+    """
+    if len(series_sorted) < 2:
+        return series_sorted, []
+
+    jumps = []
+    segments = [[series_sorted[0]]]
+    for i in range(1, len(series_sorted)):
+        prev_date, prev_nav = series_sorted[i - 1]
+        cur_date, cur_nav = series_sorted[i]
+        if prev_nav > 0 and abs(cur_nav - prev_nav) / prev_nav > jump_threshold:
+            jumps.append((prev_date.strftime("%Y-%m-%d"), prev_nav, cur_date.strftime("%Y-%m-%d"), cur_nav))
+            segments.append([])
+        segments[-1].append(series_sorted[i])
+
+    if not jumps:
+        return series_sorted, []
+
+    return segments[-1], jumps
 
 
 def nearest_point(series_sorted, target_date: datetime, tolerance_days: int = 10):

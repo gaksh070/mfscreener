@@ -131,3 +131,36 @@ dividend/income, and a couple of crypto-adjacent ETFs (BITO, IBIT) — chosen fo
 across categories and high liquidity/name recognition, not backed by AUM-ranking data
 (no free bulk ETF-AUM source was checked). Worth a sanity pass from SG before launch;
 easy to add/remove tickers later since the list is just data, not code.
+
+### 2026-07-09 — NAV history discontinuities: sanitize in backfill, isolate in nav_daily
+Building the Phase 2 home page surfaced a bogus "67% 5Y return" on an Overnight Fund —
+impossible for a cash-equivalent instrument. Root cause: `api.mfapi.in`'s historical
+series contains face-value/denomination-change artifacts — clean ~10x or ~100x single-
+day jumps (e.g. ₹116.47 → ₹1,164.89) with no real event behind them. A full scan found
+**26 of 1,688 backfilled schemes** affected. Fix: `sanitize_nav_series()` in
+`pipeline/jobs/common.py` splits a fund's history at any >50% single-day move and keeps
+only the **most recent** segment (not the longest — the stored history's tail must match
+today's live NAV scale, since `nav_daily` appends onto it daily; a longer-but-stale-scale
+segment would silently break every future day-over-day check, which is exactly what
+happened on the first attempt: the fix initially preferred the longest segment, which
+broke `nav_daily` for a scheme whose most-recent segment was short. Corrected to always
+prefer recency over length). All detected jumps are logged in `meta.json` under
+`backfill.discontinuity_scheme_codes`, never silently dropped.
+A second, distinct case surfaced the same day: scheme 118565 (Franklin India Short Term
+Income Plan) has an AMFI-reported NAV date frozen at 02-May-2025 — over a year stale,
+with a nonzero NAV — which the original "closed" detection (NAV≤0 AND stale) missed
+entirely. Generalized: `nav_daily` now also treats **any scheme stale >60 days**
+(regardless of NAV sign) as closed, carrying forward its last-good record.
+A third case (scheme 120304, UTI Liquid Fund) hit a genuine same-scale rebase between
+backfill's last mfapi.in datapoint and today's live AMFI value (~10x), which crashed the
+*entire* `nav_daily` run under the original design — one anomalous scheme aborted the
+whole job. Fixed: `nav_daily` now catches a per-scheme validation failure, flags it in
+`meta.json.jobs.nav_daily.anomalies` with the reason, carries that fund's last-good
+record forward unchanged, and continues processing every other scheme. A single bad
+scheme must never take down the daily run for the other ~1,700 — this was already the
+stated design intent for the "closed" case; it just hadn't been extended to the general
+anomaly case until real data exposed the gap.
+Also fixed in the same pass: `fetch_amfi_nav_all()` was decoding AMFI's UTF-8 file as
+ISO-8859-1 (requests' guessed fallback, since AMFI doesn't declare a charset), mangling
+apostrophes in scheme names ("Childrenâ€™s Fund" instead of "Children's Fund"). Now
+decodes `r.content` as UTF-8 explicitly.
