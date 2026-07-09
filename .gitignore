@@ -6,3 +6,5 @@ __pycache__/
 .DS_Store
 *.tmp
 .env*.local
+*.tsbuildinfo
+public/search-index.json
