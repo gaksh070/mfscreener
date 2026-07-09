@@ -44,4 +44,10 @@ jobs:
           git add data/
           git diff --cached --quiet && echo "No data changes" && exit 0
           git commit -m "chore(data): backfill $(date -u +%Y-%m-%d)"
-          git push
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 5))
+          done
+          exit 1

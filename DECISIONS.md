@@ -99,6 +99,30 @@ only" is a locked PRD business rule and this is a deviation from the architectur
 literal wording. Worth a conscious go/no-go from SG before this ships to production,
 not just an implementation detail.
 
+### 2026-07-09 — GitHub Actions: explicit `contents: write` permission required
+First live `workflow_dispatch` run of `nav-daily.yml` failed at the push step:
+"remote: Write access to repository not granted... 403." This repo's default
+`GITHUB_TOKEN` permissions are read-only (current GitHub default for repos created
+via the API/`gh`). Fixed by adding an explicit `permissions: contents: write` block to
+each workflow — least-privilege and workflow-scoped, rather than changing the repo's
+global Settings → Actions → Workflow permissions. Confirmed working on a second live run.
+
+### 2026-07-09 — funds.json concurrent-write race (accepted, documented)
+Testing both workflows via near-simultaneous manual `workflow_dispatch` runs surfaced a
+real race: `nav_daily` and `etf_daily` each read the whole `funds.json`, rebuild it
+(preserving the other market's records as they were at read-time), and write it back.
+Two overlapping runs cause a git push race (fixed with a fetch/rebase/retry loop in each
+workflow), but a *genuine* content collision on `funds.json` — both jobs changing the
+same file in the same window — would still fail, and can't cleanly auto-merge because
+`write_json_atomic` emits it minified (one line, so git can't line-diff a merge).
+**Decision: accept this for v1.** The schedules are 5 hours apart (nav-daily 17:45 UTC,
+etf-daily 22:30 UTC) specifically so this can't occur in normal scheduled operation —
+it only appeared here because both were manually dispatched at once for testing. If
+manual re-runs or additional jobs make this a real recurring problem post-launch, the
+correct fix is splitting `funds.json` into `funds_in.json` + `funds_us.json` (or per-
+market keys) so the two jobs never touch the same file — noted here rather than built
+now, since it isn't a problem the documented schedule actually has.
+
 ### 2026-07-09 — Curated US ETF list (77 tickers)
 PRD A4 scopes the ETF universe as "~75 curated ETFs," without naming them. Compiled a
 77-ticker list (`pipeline/etf_universe.json`) spanning US broad-market, sector, factor,

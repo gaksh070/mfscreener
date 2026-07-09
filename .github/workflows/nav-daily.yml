@@ -43,4 +43,17 @@ jobs:
           git add data/
           git diff --cached --quiet && echo "No data changes" && exit 0
           git commit -m "chore(data): nav_daily $(date -u +%Y-%m-%d)"
-          git push
+          # Retry handles a fast-forward race (e.g. a manual dispatch overlapping
+          # the schedule). It does NOT resolve a genuine content conflict on
+          # funds.json -- nav_daily and etf_daily both read-modify-write that
+          # single file, and it's stored minified (one line), so two concurrent
+          # edits to it can't line-merge. Scheduled runs are 5 hours apart
+          # specifically to avoid this; see DECISIONS.md 2026-07-09
+          # ("funds.json concurrent-write race").
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 5))
+          done
+          exit 1
