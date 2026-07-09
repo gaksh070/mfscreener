@@ -11,6 +11,10 @@ on:
         required: false
         default: ""
 
+# See nav-daily.yml: required because this repo's default GITHUB_TOKEN is read-only.
+permissions:
+  contents: write
+
 jobs:
   run:
     runs-on: ubuntu-latest

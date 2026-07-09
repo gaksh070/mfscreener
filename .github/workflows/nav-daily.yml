@@ -12,6 +12,13 @@ on:
 # native" per architecture doc) -- no extra step needed, but the operator
 # must keep "Actions" failure emails enabled under GitHub notification
 # settings (on by default).
+
+# Required because this repo's default GITHUB_TOKEN permissions are read-only
+# (org/account default) -- without this the commit step succeeds but the push
+# is rejected with a 403. Least-privilege: only contents, only this workflow.
+permissions:
+  contents: write
+
 jobs:
   run:
     runs-on: ubuntu-latest
